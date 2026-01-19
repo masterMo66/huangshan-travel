@@ -1,560 +1,344 @@
-<!-- Chosen Palette: Winter Solstice (Ice Blue, Slate Grey, Snow White, Sunrise Orange) -->
-<!-- Application Structure Plan: A dashboard-style Single Page Application (SPA) designed for pre-trip planning and en-route reference. 
-     1. Hero Section: Sets the mood and context (Winter Trip, Key Dates).
-     2. Interactive Itinerary (Core): A split-view section allowing users to toggle between Day 1 and Day 2. It features a detailed timeline on the left and a synchronized Elevation Profile Chart on the right to visualize physical exertion.
-     3. Preparation Hub: A gamified checklist for gear and a breakdown of logistics/costs using a Doughnut chart.
-     4. Safety & Tips: Critical warnings highlighted clearly.
-     This structure prioritizes 'What do I do next?' and 'How hard is the next part?' which are the most critical questions for a hiker. -->
-<!-- Visualization & Content Choices:
-     1. Elevation Profile (Line Chart): Goal -> Visualize physical difficulty. Method -> Chart.js Line Chart. Interaction -> Updates data based on Day 1 vs Day 2 toggle. Justification -> Hiking is about altitude; seeing the climb is more intuitive than reading meters.
-     2. Budget Breakdown (Doughnut Chart): Goal -> Inform about cost distribution. Method -> Chart.js Doughnut. Interaction -> Hover for exact values. Justification -> Quick understanding of where money goes (Transport vs. Stay).
-     3. Timeline (HTML/JS): Goal -> Step-by-step guidance. Method -> Styled list with JS expansion. Interaction -> Click to reveal details. Justification -> Prevents information overload.
-     4. Packing List (JS Interactive Grid): Goal -> Ensure preparedness. Method -> Toggleable buttons. Interaction -> Click to mark as 'Packed'. Justification -> Active engagement ensures items aren't missed. -->
-<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>黄山冬季两日游互动指南</title>
+    <title>黄山+宏村双日攻略</title>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Google Fonts: Noto Sans SC -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+
     <style>
         body {
-            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background-color: #f1f5f9; /* Slate 100 */
-            color: #1e293b; /* Slate 800 */
-        }
-        .chart-container {
-            position: relative;
-            width: 100%;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
-            height: 300px;
-            max-height: 400px;
-        }
-        @media (min-width: 768px) {
-            .chart-container {
-                height: 350px;
-            }
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f8fafc;
         }
         .timeline-line {
             position: absolute;
-            left: 15px;
-            top: 0;
-            bottom: 0;
+            left: 24px;
+            top: 20px;
+            bottom: -20px;
             width: 2px;
-            background-color: #cbd5e1;
+            background-color: #e2e8f0;
             z-index: 0;
         }
-        .active-tab {
-            border-bottom: 2px solid #f97316;
-            color: #f97316;
-            font-weight: bold;
+        .last-item .timeline-line {
+            display: none;
         }
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
         }
-        /* Custom scrollbar for timeline container */
-        .timeline-scroll::-webkit-scrollbar {
-            width: 6px;
+        .tab-active {
+            background-color: #ffffff;
+            color: #0f172a;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
         }
-        .timeline-scroll::-webkit-scrollbar-track {
-            background: #f1f5f9;
+        .tab-inactive {
+            color: #64748b;
         }
-        .timeline-scroll::-webkit-scrollbar-thumb {
-            background-color: #cbd5e1;
-            border-radius: 20px;
+        .tab-inactive:hover {
+            color: #334155;
         }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
+<body>
+    <div id="root"></div>
 
-    <!-- Hero Section -->
-    <header class="bg-slate-800 text-white relative overflow-hidden">
-        <div class="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80')] bg-cover bg-center"></div>
-        <div class="container mx-auto px-4 py-12 relative z-10 text-center">
-            <h1 class="text-3xl md:text-5xl font-bold mb-2">🏔️ 黄山冬季踏雪之旅</h1>
-            <p class="text-slate-300 text-lg mb-6">合肥出发 · 错峰两日游 · 1月24日 - 25日</p>
-            <div class="flex flex-wrap justify-center gap-4 text-sm font-medium">
-                <span class="bg-white/10 px-4 py-2 rounded-full border border-white/20">❄️ 冬季雾凇</span>
-                <span class="bg-white/10 px-4 py-2 rounded-full border border-white/20">🌅 云海日出</span>
-                <span class="bg-white/10 px-4 py-2 rounded-full border border-white/20">🚶 后山上前山下</span>
-            </div>
-        </div>
-    </header>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
-    <!-- Main Navigation -->
-    <nav class="sticky top-0 z-50 bg-white shadow-md">
-        <div class="container mx-auto px-4">
-            <div class="flex justify-center space-x-8 text-sm md:text-base">
-                <button onclick="switchView('itinerary')" id="nav-itinerary" class="active-tab py-4 px-2 transition-colors hover:text-orange-500">行程规划</button>
-                <button onclick="switchView('prep')" id="nav-prep" class="py-4 px-2 transition-colors text-slate-500 hover:text-orange-500">装备与预算</button>
-                <button onclick="switchView('tips')" id="nav-tips" class="py-4 px-2 transition-colors text-slate-500 hover:text-orange-500">重要贴士</button>
-            </div>
-        </div>
-    </nav>
+        // Icons
+        const IconMountain = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>;
+        const IconAlert = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>;
+        const IconCableCar = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 3h4v11h-4z"/><rect x="6" y="14" width="12" height="6" rx="2"/><path d="M11 11h2"/></svg>;
+        const IconWalk = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 4v6l-1.5 5"/><path d="M10.5 4v5.5"/><path d="M6 21l3-7 5-4 4 2"/><path d="M13.5 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></svg>;
+        const IconTrain = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M12 3v8"/><path d="m8 19-2 3"/><path d="m18 22-2-3"/><path d="M8 15h0"/><path d="M16 15h0"/></svg>;
+        const IconVillage = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+        const IconCamera = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
+        const IconFood = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>;
 
-    <main class="container mx-auto px-4 py-8 max-w-6xl">
-
-        <!-- VIEW 1: ITINERARY & ELEVATION -->
-        <div id="view-itinerary" class="animate-fade-in block">
-            <div class="mb-8 text-center max-w-3xl mx-auto">
-                <h2 class="text-2xl font-bold text-slate-800 mb-2">每日行程与海拔概览</h2>
-                <p class="text-slate-600">本板块结合了详细的时间表与海拔变化图。点击下方按钮切换日期，查看当天的徒步路线强度与关键节点。这有助于您合理分配体力。</p>
-            </div>
-
-            <!-- Day Toggle -->
-            <div class="flex justify-center mb-8">
-                <div class="bg-slate-200 p-1 rounded-lg inline-flex">
-                    <button onclick="setDay(1)" id="btn-day1" class="px-6 py-2 rounded-md bg-white shadow-sm text-slate-800 font-medium transition-all">Day 1: 登顶赏雪</button>
-                    <button onclick="setDay(2)" id="btn-day2" class="px-6 py-2 rounded-md text-slate-500 hover:text-slate-700 font-medium transition-all ml-1">Day 2: 下山揽胜</button>
+        const TimelineItem = ({ time, title, desc, icon: Icon, isLast, highlight, warning, extraContent }) => (
+            <div className={`relative flex gap-4 pb-8 ${isLast ? 'last-item' : ''}`}>
+                <div className="timeline-line"></div>
+                <div className={`relative z-10 flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center border-4 border-white shadow-sm ${highlight ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                    <Icon />
                 </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <!-- Left: Interactive Timeline -->
-                <div class="glass-panel rounded-xl p-6 h-[500px] flex flex-col">
-                    <h3 class="text-xl font-bold mb-4 flex items-center">
-                        <span id="timeline-title" class="mr-2">📅 1月24日 (周六)</span>
-                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">行程紧凑</span>
-                    </h3>
-                    <div id="timeline-container" class="relative pl-2 overflow-y-auto timeline-scroll flex-1 pr-2">
-                        <!-- Timeline Content Injected by JS -->
+                <div className="flex-1 pt-1">
+                    <div className="flex flex-col sm:flex-row sm:items-baseline justify-between mb-1">
+                        <h3 className="font-bold text-gray-900 text-lg">{title}</h3>
+                        <span className="text-sm font-mono font-medium text-emerald-700">{time}</span>
                     </div>
-                </div>
-
-                <!-- Right: Elevation Chart -->
-                <div class="glass-panel rounded-xl p-6 flex flex-col justify-center">
-                    <h3 class="text-xl font-bold mb-2">🏔️ 海拔与体能分析</h3>
-                    <p class="text-sm text-slate-500 mb-4">展示当天主要景点的海拔变化，帮助您预估攀登难度。</p>
+                    <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">{desc}</p>
                     
-                    <div class="chart-container">
-                        <canvas id="elevationChart"></canvas>
-                    </div>
-                    
-                    <div id="day-stats" class="grid grid-cols-3 gap-4 mt-6 text-center border-t border-slate-100 pt-4">
-                        <!-- Stats Injected by JS -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- VIEW 2: PREPARATION & BUDGET -->
-        <div id="view-prep" class="hidden">
-            <div class="mb-8 text-center max-w-3xl mx-auto">
-                <h2 class="text-2xl font-bold text-slate-800 mb-2">行前准备与预算</h2>
-                <p class="text-slate-600">冬季黄山环境特殊，装备至关重要。请使用下方的互动清单检查行李，并参考预算图表规划开支。</p>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <!-- Packing List -->
-                <div class="glass-panel rounded-xl p-6">
-                    <h3 class="text-xl font-bold mb-4 text-orange-600">🎒 智能装箱清单 (点击标记)</h3>
-                    
-                    <div class="space-y-6">
-                        <div>
-                            <h4 class="font-semibold text-slate-700 mb-2">必备装备 (生命线)</h4>
-                            <div class="flex flex-wrap gap-2" id="pack-gear">
-                                <!-- Items injected by JS -->
-                            </div>
+                    {extraContent && (
+                        <div className="mt-3 grid grid-cols-1 gap-2">
+                            {extraContent}
                         </div>
-                        <div>
-                            <h4 class="font-semibold text-slate-700 mb-2">衣物保暖 (洋葱穿衣)</h4>
-                            <div class="flex flex-wrap gap-2" id="pack-clothes"></div>
-                        </div>
-                        <div>
-                            <h4 class="font-semibold text-slate-700 mb-2">食品与杂项</h4>
-                            <div class="flex flex-wrap gap-2" id="pack-food"></div>
-                        </div>
-                    </div>
-                </div>
+                    )}
 
-                <!-- Budget Chart -->
-                <div class="glass-panel rounded-xl p-6">
-                    <h3 class="text-xl font-bold mb-4 text-blue-600">💰 预计花费构成</h3>
-                    <div class="flex flex-col items-center">
-                        <div class="chart-container">
-                            <canvas id="budgetChart"></canvas>
+                    {warning && (
+                        <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg flex gap-3 items-start">
+                            <div className="mt-0.5"><IconAlert /></div>
+                            <p className="text-xs text-red-700 font-medium">{warning}</p>
                         </div>
-                        <p class="text-xs text-slate-400 mt-4 text-center">* 估算值，基于通常山顶住宿及高铁费用。</p>
-                        
-                        <div class="w-full mt-6 bg-blue-50 p-4 rounded-lg text-sm text-blue-800">
-                            <strong>💡 省钱贴士:</strong>
-                            <ul class="list-disc pl-5 mt-1 space-y-1">
-                                <li>山顶住宿是大头，越早定越便宜，也可考虑多人床位。</li>
-                                <li>自热米饭山下超市约15元，山上约45元，建议自备。</li>
-                                <li>门票学生、老年人有优惠，记得带证件。</li>
-                            </ul>
-                        </div>
-                    </div>
+                    )}
                 </div>
             </div>
-        </div>
+        );
 
-        <!-- VIEW 3: TIPS & SAFETY -->
-        <div id="view-tips" class="hidden">
-             <div class="mb-8 text-center max-w-3xl mx-auto">
-                <h2 class="text-2xl font-bold text-slate-800 mb-2">安全须知与重要提示</h2>
-                <p class="text-slate-600">冬季黄山风景虽美，但安全第一。请仔细阅读以下关于路况、天气和运营时间的警告。</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-red-50 border border-red-100 rounded-xl p-6">
-                    <div class="text-3xl mb-3">⚠️</div>
-                    <h3 class="font-bold text-red-800 text-lg mb-2">冬季关闭区域</h3>
-                    <p class="text-red-700 text-sm leading-relaxed">
-                        1. <strong>西海大峡谷</strong>：冬季积雪严重，路滑危险，通常全线关闭。<br>
-                        2. <strong>天都峰/莲花峰</strong>：轮休或冬季维护期关闭。<br>
-                        <span class="font-bold">切勿翻越栏杆进入封闭区！</span>
-                    </p>
-                </div>
-
-                <div class="bg-orange-50 border border-orange-100 rounded-xl p-6">
-                    <div class="text-3xl mb-3">🕒</div>
-                    <h3 class="font-bold text-orange-800 text-lg mb-2">时间管理红线</h3>
-                    <p class="text-orange-700 text-sm leading-relaxed">
-                        <strong>索道停运时间：</strong>通常为 16:30 - 17:00。<br>
-                        错过索道需步行3-4小时下山，夜间极度危险。<br>
-                        建议提前半小时到达索道站排队。
-                    </p>
-                </div>
-
-                <div class="bg-blue-50 border border-blue-100 rounded-xl p-6">
-                    <div class="text-3xl mb-3">🧊</div>
-                    <h3 class="font-bold text-blue-800 text-lg mb-2">防滑保暖</h3>
-                    <p class="text-blue-700 text-sm leading-relaxed">
-                        <strong>冰爪(钉鞋)</strong> 是必须品！阴面台阶全是暗冰。<br>
-                        山上风速极大，体感温度可能低于零下10度，务必带帽子和手套（最好防水，可以玩雪）。
-                    </p>
+        const InfoCard = ({ icon: Icon, title, children, colorClass = "bg-slate-50 text-slate-700" }) => (
+            <div className={`flex items-start gap-2 p-3 rounded-lg text-xs ${colorClass}`}>
+                <div className="mt-0.5 shrink-0 opacity-70"><Icon /></div>
+                <div>
+                    <span className="font-bold block mb-1">{title}</span>
+                    <span className="opacity-90">{children}</span>
                 </div>
             </div>
+        );
 
-            <!-- Train Table -->
-            <div class="mt-8 glass-panel rounded-xl p-6">
-                <h3 class="text-lg font-bold mb-4">🚄 推荐车次参考</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left text-slate-600">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100">
-                            <tr>
-                                <th class="px-6 py-3">方向</th>
-                                <th class="px-6 py-3">车次</th>
-                                <th class="px-6 py-3">发车时间</th>
-                                <th class="px-6 py-3">到达时间</th>
-                                <th class="px-6 py-3">建议</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="bg-white border-b hover:bg-slate-50">
-                                <td class="px-6 py-4 font-medium text-slate-900">去程 (合肥->黄山)</td>
-                                <td class="px-6 py-4">G7709</td>
-                                <td class="px-6 py-4">07:10</td>
-                                <td class="px-6 py-4">08:50</td>
-                                <td class="px-6 py-4 text-green-600">最佳推荐，进山时间充裕</td>
-                            </tr>
-                            <tr class="bg-white border-b hover:bg-slate-50">
-                                <td class="px-6 py-4 font-medium text-slate-900">去程 (合肥->黄山)</td>
-                                <td class="px-6 py-4">G7403</td>
-                                <td class="px-6 py-4">07:44</td>
-                                <td class="px-6 py-4">09:25</td>
-                                <td class="px-6 py-4">备选方案</td>
-                            </tr>
-                            <tr class="bg-white border-b hover:bg-slate-50">
-                                <td class="px-6 py-4 font-medium text-slate-900">返程 (黄山->合肥)</td>
-                                <td class="px-6 py-4">G7194</td>
-                                <td class="px-6 py-4">17:06</td>
-                                <td class="px-6 py-4">18:40</td>
-                                <td class="px-6 py-4">下山不慌张</td>
-                            </tr>
-                            <tr class="bg-white hover:bg-slate-50">
-                                <td class="px-6 py-4 font-medium text-slate-900">返程 (黄山->合肥)</td>
-                                <td class="px-6 py-4">G7316</td>
-                                <td class="px-6 py-4">17:48</td>
-                                <td class="px-6 py-4">19:15</td>
-                                <td class="px-6 py-4">如果下山较晚选此班</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('day1'); // 'day1' or 'day2'
 
-    </main>
-
-    <footer class="bg-slate-800 text-slate-400 py-8 text-center mt-12">
-        <p class="text-sm">Made with 💙 for your Winter Trip | 此指南基于 1月24日-25日 计划生成</p>
-        <p class="text-xs mt-2 text-slate-500">出行前请务必再次核对官方天气预报与索道公告</p>
-    </footer>
-
-    <script>
-        // --- DATA & STATE ---
-        const state = {
-            currentDay: 1,
-            packedItems: new Set()
-        };
-
-        const data = {
-            day1: {
-                title: "1月24日 (周六): 踏雪寻梅，云端漫步",
-                stats: { dist: "6km 徒步", time: "5h 游览", elev: "↑800m" },
-                timeline: [
-                    { time: "07:15", title: "出发", icon: "🚄", desc: "合肥南站 G7709/G7403 前往黄山北站。" },
-                    { time: "09:00", title: "换乘", icon: "🚌", desc: "黄山北站客运中心乘专线大巴至寨西换乘中心 (约50分钟)。" },
-                    { time: "10:30", title: "进山", icon: "🏔️", desc: "在寨西寄存行李，买票乘景区大巴前往【云谷寺】方向(后山)。" },
-                    { time: "11:00", title: "索道上行", icon: "🚡", desc: "乘坐云谷索道上山，俯瞰雪松竹海。" },
-                    { time: "11:30", title: "始信峰", icon: "🌲", desc: "抵达白鹅岭，徒步至始信峰看奇松（黑虎松、连理松）。" },
-                    { time: "12:30", title: "午餐", icon: "🍱", desc: "在北海宾馆附近休息，吃自带干粮。" },
-                    { time: "13:30", title: "北海景区", icon: "🐒", desc: "游览清凉台、猴子观海。运气好可见云海翻腾。" },
-                    { time: "15:30", title: "排云亭", icon: "❄️", desc: "经西海饭店至排云亭，看西海大峡谷雪景（峡谷谷底关闭，看一眼即回）。" },
-                    { time: "17:15", title: "日落", icon: "🌅", desc: "在排云亭或丹霞峰观赏晚霞日落，随后入住酒店。" }
-                ],
-                chartLabels: ["云谷寺", "白鹅岭", "始信峰", "北海", "猴子观海", "排云亭", "丹霞峰"],
-                chartData: [890, 1650, 1680, 1610, 1700, 1605, 1700] // Approximate elevations
-            },
-            day2: {
-                title: "1月25日 (周日): 极顶日出，峥嵘前山",
-                stats: { dist: "8km 徒步", time: "6h 游览", elev: "↓900m" },
-                timeline: [
-                    { time: "06:00", title: "日出", icon: "☀️", desc: "光明顶或清凉台看日出（冬季约6:30-7:00，需提前占位）。" },
-                    { time: "08:30", title: "光明顶", icon: "🔭", desc: "退房出发，经飞来石（红楼梦取景地）登顶光明顶，360度观景。" },
-                    { time: "10:00", title: "天海&鳌鱼峰", icon: "🐢", desc: "下行至天海，翻越鳌鱼峰，走百步云梯。路陡地滑，务必穿冰爪！" },
-                    { time: "12:00", title: "迎客松", icon: "🌲", desc: "抵达玉屏楼，打卡国宝迎客松，看象鼻石。" },
-                    { time: "13:30", title: "索道下山", icon: "🚡", desc: "乘坐玉屏索道下山（强烈建议，步行极其伤膝盖）。" },
-                    { time: "14:30", title: "返程换乘", icon: "🚌", desc: "慈光阁乘大巴回寨西换乘中心，取行李。" },
-                    { time: "15:30", title: "前往车站", icon: "🚕", desc: "乘大巴或拼车至黄山北站。" },
-                    { time: "17:06", title: "高铁返程", icon: "🚄", desc: "G7194或G7316返回合肥，结束行程。" }
-                ],
-                chartLabels: ["北海/西海", "飞来石", "光明顶", "天海", "鳌鱼峰", "迎客松", "慈光阁"],
-                chartData: [1600, 1730, 1860, 1750, 1780, 1670, 850] // Approximate elevations
-            }
-        };
-
-        const packingList = {
-            gear: ["身份证/学生证", "防滑冰爪 (必备)", "登山杖", "充电宝", "保温杯"],
-            clothes: ["速干内衣", "抓绒衣/毛衣", "羽绒服/冲锋衣", "保暖手套 (防水)", "毛线帽/耳罩", "围巾", "登山鞋/雪地靴"],
-            food: ["自热米饭 (1-2盒)", "巧克力/士力架", "牛肉干", "水 (适量)"]
-        };
-
-        // --- INIT CHARTS ---
-        let elevationChart = null;
-        let budgetChart = null;
-
-        function initCharts() {
-            // Elevation Chart
-            const ctxElev = document.getElementById('elevationChart').getContext('2d');
-            elevationChart = new Chart(ctxElev, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: '海拔高度 (米)',
-                        data: [],
-                        borderColor: '#f97316',
-                        backgroundColor: 'rgba(249, 115, 22, 0.1)',
-                        borderWidth: 3,
-                        pointBackgroundColor: '#fff',
-                        pointBorderColor: '#f97316',
-                        pointRadius: 5,
-                        fill: true,
-                        tension: 0.3
-                    }]
+            // Data for Day 1
+            const day1Timeline = [
+                {
+                    time: "前夜 / 07:30",
+                    title: "准备进山",
+                    icon: IconTrain,
+                    desc: "建议前一晚住汤口镇。早起前往【寨西换乘中心】，购票乘大巴至云谷寺。",
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `海拔: ${context.raw}米`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: false,
-                            min: 600,
-                            max: 2000,
-                            grid: { color: '#e2e8f0' }
-                        },
-                        x: {
-                            grid: { display: false }
-                        }
-                    }
-                }
-            });
-
-            // Budget Chart
-            const ctxBudget = document.getElementById('budgetChart').getContext('2d');
-            budgetChart = new Chart(ctxBudget, {
-                type: 'doughnut',
-                data: {
-                    labels: ['交通 (高铁/大巴/索道)', '门票 (进山)', '住宿 (山顶)', '餐饮/杂项'],
-                    datasets: [{
-                        data: [600, 190, 1000, 300], // Estimated values
-                        backgroundColor: [
-                            '#3b82f6', // blue
-                            '#10b981', // green
-                            '#f97316', // orange
-                            '#64748b'  // slate
-                        ],
-                        borderWidth: 0
-                    }]
+                {
+                    time: "08:30",
+                    title: "云谷索道上山",
+                    icon: IconCableCar,
+                    desc: "尽量早起避开人流。如果不恐高，索道靠右站看风景。",
+                    highlight: true
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.raw;
-                                    const total = context.chart._metasets[context.datasetIndex].total;
-                                    const percentage = Math.round((value / total) * 100) + '%';
-                                    return `${context.label}: 约 ¥${value} (${percentage})`;
-                                }
-                            }
-                        }
-                    }
+                {
+                    time: "09:00 - 11:30",
+                    title: "后山：奇松怪石",
+                    icon: IconMountain,
+                    desc: "始信峰（看松）→ 黑虎松 → 梦笔生花 → 北海宾馆 → 猴子观海（必去）。",
+                },
+                {
+                    time: "12:30 - 14:00",
+                    title: "核心：飞来石与光明顶",
+                    icon: IconMountain,
+                    desc: "排云亭 → 飞来石（红楼梦打卡）→ 光明顶（最高点，全景视角）。",
+                },
+                {
+                    time: "14:00 - 15:30",
+                    title: "前山：走向迎客松",
+                    icon: IconWalk,
+                    desc: "光明顶 → 鳌鱼峰 → 百步云梯 → 迎客松。打卡国宝级松树。",
+                },
+                {
+                    time: "15:30 - 17:30",
+                    title: "徒步下山（硬核）",
+                    icon: IconWalk,
+                    highlight: true,
+                    warning: "玉屏索道停运！必须徒步下山至慈光阁（约6公里陡坡）。",
+                    desc: "这是全天最累的一段，护膝非常重要！\n下山后乘大巴返回汤口换乘中心。",
+                },
+                {
+                    time: "18:00",
+                    title: "决定去留",
+                    icon: IconVillage,
+                    isLast: true,
+                    desc: "方案A：直接取行李去高铁站返程。\n方案B：拼车去宏村（约50元/人），住宏村景区内，吃臭鳜鱼。",
                 }
-            });
-        }
+            ];
 
-        // --- VIEW CONTROLLER ---
-        function switchView(viewId) {
-            // Hide all views
-            document.getElementById('view-itinerary').classList.add('hidden');
-            document.getElementById('view-prep').classList.add('hidden');
-            document.getElementById('view-tips').classList.add('hidden');
+            // Data for Day 2 (Hongcun)
+            const day2Timeline = [
+                {
+                    time: "08:00 - 09:00",
+                    title: "晨唤宏村",
+                    icon: IconVillage,
+                    highlight: true,
+                    desc: "如果住村内，清晨是宏村最美的时刻，游客未至，炊烟袅袅。",
+                    extraContent: [
+                         <InfoCard key="photo" icon={IconCamera} title="必拍机位：南湖画桥" colorClass="bg-indigo-50 text-indigo-800">
+                            清晨的南湖平静如镜，过桥时拍倒影最美。
+                        </InfoCard>
+                    ]
+                },
+                {
+                    time: "09:00 - 10:30",
+                    title: "画里乡村漫步",
+                    icon: IconWalk,
+                    desc: "路线：南湖 → 南湖书院 → 敬德堂 → 汪氏宗祠。仔细看徽派建筑的“三雕”（砖雕、石雕、木雕）。"
+                },
+                {
+                    time: "10:30 - 11:30",
+                    title: "核心：月沼（半月泉）",
+                    icon: IconCamera,
+                    desc: "宏村的心脏。这里是电影《卧虎藏龙》周润发牵马走过的地方。",
+                    extraContent: [
+                        <InfoCard key="tip" icon={IconCamera} title="拍照Tips" colorClass="bg-indigo-50 text-indigo-800">
+                             站在月沼北侧正中，可以拍出半月形池塘与老房子的完美对称。
+                        </InfoCard>
+                    ]
+                },
+                {
+                    time: "11:30 - 12:30",
+                    title: "豪宅：承志堂",
+                    icon: IconVillage,
+                    desc: "被称为“民间故宫”，是清末大盐商的私宅。务必抬头看梁上的金箔木雕，非常奢华。",
+                },
+                {
+                    time: "12:30 - 13:30",
+                    title: "徽州味道（午餐）",
+                    icon: IconFood,
+                    desc: "在村里或村口老街用餐。",
+                    extraContent: [
+                         <InfoCard key="food" icon={IconFood} title="必吃菜单" colorClass="bg-orange-50 text-orange-800">
+                            1. 臭鳜鱼（闻着臭吃着香）<br/>
+                            2. 毛豆腐（舌尖上的中国推荐）<br/>
+                            3. 乌饭（软糯香甜）
+                        </InfoCard>
+                    ]
+                },
+                {
+                    time: "14:00",
+                    title: "返程",
+                    icon: IconTrain,
+                    isLast: true,
+                    desc: "在宏村停车场乘坐班车或拼车直达【黄山北站】（约1.5小时）。\n建议购买16:00以后的返程高铁。",
+                }
+            ];
+
+            const currentTimeline = activeTab === 'day1' ? day1Timeline : day2Timeline;
             
-            // Remove active class from nav
-            document.getElementById('nav-itinerary').className = "py-4 px-2 transition-colors text-slate-500 hover:text-orange-500";
-            document.getElementById('nav-prep').className = "py-4 px-2 transition-colors text-slate-500 hover:text-orange-500";
-            document.getElementById('nav-tips').className = "py-4 px-2 transition-colors text-slate-500 hover:text-orange-500";
-
-            // Show selected view and activate nav
-            document.getElementById(`view-${viewId}`).classList.remove('hidden');
-            document.getElementById(`nav-${viewId}`).className = "active-tab py-4 px-2 transition-colors hover:text-orange-500";
+            // Image Logic (Using reliable sources)
+            const headerImage = activeTab === 'day1' 
+                ? "https://images.pexels.com/photos/17693156/pexels-photo-17693156.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1" // Mountain vibe
+                : "https://images.pexels.com/photos/18485786/pexels-photo-18485786/free-photo-of-river-in-traditional-chinese-village.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"; // Ancient village vibe
             
-            // Re-render charts if needed (canvas resize fix)
-            if(viewId === 'itinerary' && elevationChart) elevationChart.resize();
-            if(viewId === 'prep' && budgetChart) budgetChart.resize();
-        }
+            const stats = activeTab === 'day1'
+                ? { label1: '步数', val1: '3W+', label2: '花费', val2: '¥253起', label3: '难度', val3: '硬核' }
+                : { label1: '步数', val1: '1W', label2: '门票', val2: '¥104', label3: '节奏', val3: '休闲' };
 
-        // --- DAY CONTROLLER ---
-        function setDay(dayNum) {
-            state.currentDay = dayNum;
-            const dayData = dayNum === 1 ? data.day1 : data.day2;
-
-            // Update Buttons
-            const btn1 = document.getElementById('btn-day1');
-            const btn2 = document.getElementById('btn-day2');
-            
-            if(dayNum === 1) {
-                btn1.className = "px-6 py-2 rounded-md bg-white shadow-sm text-slate-800 font-medium transition-all";
-                btn2.className = "px-6 py-2 rounded-md text-slate-500 hover:text-slate-700 font-medium transition-all ml-1";
-            } else {
-                btn1.className = "px-6 py-2 rounded-md text-slate-500 hover:text-slate-700 font-medium transition-all mr-1";
-                btn2.className = "px-6 py-2 rounded-md bg-white shadow-sm text-slate-800 font-medium transition-all";
-            }
-
-            // Update Timeline Title
-            document.getElementById('timeline-title').innerText = dayData.title.split(":")[0];
-
-            // Render Timeline
-            const timelineContainer = document.getElementById('timeline-container');
-            timelineContainer.innerHTML = `<div class="timeline-line"></div>`; // Reset and add line
-            
-            dayData.timeline.forEach((item, index) => {
-                const isLast = index === dayData.timeline.length - 1;
-                const html = `
-                    <div class="relative pl-8 mb-6 group cursor-pointer" onclick="toggleTimelineDetail(this)">
-                        <div class="absolute left-[6px] top-1 w-5 h-5 bg-white border-2 border-orange-400 rounded-full z-10 flex items-center justify-center text-[10px] group-hover:scale-110 transition-transform">
-                            ${index + 1}
+            return (
+                <div className="max-w-md mx-auto bg-white min-h-screen shadow-2xl overflow-hidden pb-10">
+                    
+                    {/* Header Image Area */}
+                    <div className="relative h-60 bg-slate-800">
+                        <img 
+                            src={headerImage}
+                            alt="Header" 
+                            className="w-full h-full object-cover opacity-80 transition-opacity duration-700 ease-in-out"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent"></div>
+                        <div className="absolute bottom-4 left-6 text-white">
+                            <span className="inline-block px-2 py-1 bg-emerald-600/90 backdrop-blur-sm text-[10px] font-bold rounded mb-2 tracking-wider">
+                                {activeTab === 'day1' ? '1月24日 · 核心行程' : '1月25日 · 备选行程'}
+                            </span>
+                            <h1 className="text-3xl font-bold tracking-tight mb-1">
+                                {activeTab === 'day1' ? '黄山特种兵一日' : '宏村水墨画里游'}
+                            </h1>
+                            <p className="text-slate-200 text-xs opacity-90">
+                                {activeTab === 'day1' ? '云谷上 · 徒步下 · 挑战极限' : '南湖晨雾 · 月沼倒影 · 徽州美食'}
+                            </p>
                         </div>
-                        <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-100 hover:border-orange-200 transition-colors">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <span class="inline-block bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded mb-1 font-mono">${item.time}</span>
-                                    <h4 class="font-bold text-slate-800">${item.icon} ${item.title}</h4>
+                    </div>
+
+                    {/* Tab Navigation */}
+                    <div className="flex bg-slate-100 p-1.5 mx-4 -mt-6 relative z-10 rounded-xl shadow-lg border border-white">
+                        <button 
+                            onClick={() => setActiveTab('day1')}
+                            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all duration-300 ${activeTab === 'day1' ? 'tab-active' : 'tab-inactive'}`}
+                        >
+                            Day 1 黄山
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('day2')}
+                            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all duration-300 ${activeTab === 'day2' ? 'tab-active' : 'tab-inactive'}`}
+                        >
+                            Day 2 宏村 (备选)
+                        </button>
+                    </div>
+
+                    {/* Quick Stats Bar */}
+                    <div className="flex justify-between px-8 py-6 border-b border-slate-50">
+                        <div className="text-center">
+                            <div className="text-lg font-bold text-slate-800">{stats.val1}</div>
+                            <div className="text-xs text-slate-400 font-medium">{stats.label1}</div>
+                        </div>
+                        <div className="w-px bg-slate-100"></div>
+                        <div className="text-center">
+                            <div className="text-lg font-bold text-slate-800">{stats.val2}</div>
+                            <div className="text-xs text-slate-400 font-medium">{stats.label2}</div>
+                        </div>
+                        <div className="w-px bg-slate-100"></div>
+                        <div className="text-center">
+                            <div className="text-lg font-bold text-slate-800">{stats.val3}</div>
+                            <div className="text-xs text-slate-400 font-medium">{stats.label3}</div>
+                        </div>
+                    </div>
+
+                    {/* Timeline Container */}
+                    <div className="px-6 mt-6 min-h-[400px]">
+                        {activeTab === 'day1' && (
+                            <div className="animate-fade-in">
+                                <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3">
+                                    <div className="mt-0.5 text-red-600"><IconAlert /></div>
+                                    <div>
+                                        <h4 className="text-sm font-bold text-red-800 mb-1">今日核心预警</h4>
+                                        <p className="text-xs text-red-700 leading-relaxed">
+                                            玉屏索道（前山下行）<strong>停运</strong>。请做好全程步行下山（约2小时）的心理准备，护膝是必须品。
+                                        </p>
+                                    </div>
                                 </div>
-                                <span class="text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity text-sm">▼</span>
+                                <div className="relative">
+                                    {day1Timeline.map((item, idx) => (
+                                        <TimelineItem key={idx} {...item} isLast={idx === day1Timeline.length - 1} />
+                                    ))}
+                                </div>
                             </div>
-                            <p class="text-sm text-slate-600 mt-2 leading-relaxed">${item.desc}</p>
-                        </div>
+                        )}
+
+                        {activeTab === 'day2' && (
+                            <div className="animate-fade-in">
+                                <div className="mb-6 p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                                    <h4 className="text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                                        <IconVillage /> 宏村速览
+                                    </h4>
+                                    <p className="text-xs text-indigo-800 leading-relaxed">
+                                        宏村有着“中国画里乡村”的美誉。全村主要看水系设计，按照“牛”的形状布局。游览重点在清晨和傍晚，避开中午人流高峰。
+                                    </p>
+                                </div>
+                                <div className="relative">
+                                    {day2Timeline.map((item, idx) => (
+                                        <TimelineItem key={idx} {...item} isLast={idx === day2Timeline.length - 1} />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                `;
-                timelineContainer.insertAdjacentHTML('beforeend', html);
-            });
+                    
+                    {/* Footer */}
+                    <div className="text-center py-8 text-slate-300 text-xs bg-slate-50 mt-4 border-t border-slate-100">
+                        <p>路线及政策可能临时调整，请以景区当日公告为准</p>
+                        <p className="mt-1">祝您旅途愉快！</p>
+                    </div>
 
-            // Update Stats
-            const statsContainer = document.getElementById('day-stats');
-            statsContainer.innerHTML = `
-                <div><div class="text-2xl font-bold text-slate-700">${dayData.stats.dist}</div><div class="text-xs text-slate-400">距离</div></div>
-                <div><div class="text-2xl font-bold text-slate-700">${dayData.stats.time}</div><div class="text-xs text-slate-400">时长</div></div>
-                <div><div class="text-2xl font-bold text-orange-500">${dayData.stats.elev}</div><div class="text-xs text-slate-400">海拔变化</div></div>
-            `;
-
-            // Update Chart
-            if(elevationChart) {
-                elevationChart.data.labels = dayData.chartLabels;
-                elevationChart.data.datasets[0].data = dayData.chartData;
-                elevationChart.update();
-            }
-        }
-
-        function toggleTimelineDetail(element) {
-            // Optional: Add specific interaction logic here if we wanted detailed expansion
-            // Currently using a simple hover/card effect
-            element.querySelector('.bg-white').classList.toggle('ring-2');
-            element.querySelector('.bg-white').classList.toggle('ring-orange-200');
-        }
-
-        // --- PACKING LIST ---
-        function renderPackingList() {
-            const createItem = (id, text, category) => {
-                const btn = document.createElement('button');
-                btn.className = "px-3 py-1.5 rounded-full text-sm border transition-all text-slate-600 border-slate-300 hover:border-orange-400 hover:text-orange-500 bg-white";
-                btn.innerHTML = `<span>○</span> ${text}`;
-                btn.onclick = () => {
-                    if(state.packedItems.has(id)) {
-                        state.packedItems.delete(id);
-                        btn.className = "px-3 py-1.5 rounded-full text-sm border transition-all text-slate-600 border-slate-300 hover:border-orange-400 hover:text-orange-500 bg-white";
-                        btn.innerHTML = `<span>○</span> ${text}`;
-                    } else {
-                        state.packedItems.add(id);
-                        btn.className = "px-3 py-1.5 rounded-full text-sm border transition-all text-white bg-green-500 border-green-600 shadow-sm";
-                        btn.innerHTML = `<span>✓</span> ${text}`;
-                    }
-                };
-                return btn;
-            };
-
-            const gearContainer = document.getElementById('pack-gear');
-            packingList.gear.forEach((item, i) => gearContainer.appendChild(createItem(`g${i}`, item, 'gear')));
-
-            const clothesContainer = document.getElementById('pack-clothes');
-            packingList.clothes.forEach((item, i) => clothesContainer.appendChild(createItem(`c${i}`, item, 'clothes')));
-
-            const foodContainer = document.getElementById('pack-food');
-            packingList.food.forEach((item, i) => foodContainer.appendChild(createItem(`f${i}`, item, 'food')));
-        }
-
-        // --- INITIALIZATION ---
-        window.onload = function() {
-            initCharts();
-            setDay(1);
-            renderPackingList();
+                </div>
+            );
         };
 
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
