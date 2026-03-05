@@ -14,7 +14,7 @@
 ## 🚀 在线访问
 
 部署在 GitHub Pages 后，访问地址为：
-`https://你的用户名.github.io/仓库名/`
+`https://moqi.chat/`
 
 ## 📁 文件说明
 
@@ -58,3 +58,9 @@
 
 Made with 💙 for your Winter Trip
 
+
+## 📄 License
+
+This project is licensed under **CC BY-NC 4.0** (Attribution-NonCommercial).
+
+See [LICENSE](./LICENSE).
