@@ -58,3 +58,9 @@
 
 Made with 💙 for your Winter Trip
 
+
+## 📄 License
+
+This project is licensed under **CC BY-NC 4.0** (Attribution-NonCommercial).
+
+See [LICENSE](./LICENSE).
